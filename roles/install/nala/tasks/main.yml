@@ -1,0 +1,18 @@
+---
+# https://gitlab.com/api/v4/projects/volian%2Fnala/releases/permalink/latest/ to get newest release info
+- name: Check if nala is installed already
+  ansible.builtin.stat:
+    path: "{{ nala_binary_path }}"
+  register: binary_exists
+
+- name: Download nala's .deb
+  ansible.builtin.uri:
+    url: https://deb.volian.org/volian/pool/main/n/nala-legacy/nala-legacy_0.11.0_amd64.deb
+    dest: /tmp/nala.deb
+  when: binary_exists.stat.exists == false
+
+- name: Install nala's .deb
+  ansible.builtin.apt:
+    deb: /tmp/nala.deb
+    state: present
+  when: binary_exists.stat.exists == false

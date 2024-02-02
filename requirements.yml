@@ -1,0 +1,40 @@
+---
+roles:
+  - src: geerlingguy.docker             # https://github.com/geerlingguy/ansible-role-docker
+  - src: geerlingguy.security           # https://github.com/geerlingguy/ansible-role-security
+  - src: grog.package                   # https://github.com/GROG/ansible-role-package
+  - src: weareinteractive.environment   # https://github.com/weareinteractive/ansible-environment
+  - src: dj-wasabi.telegraf             # https://github.com/dj-wasabi/ansible-telegraf
+  - src: artis3n.tailscale
+
+# collections:
+# - community.docker # https://docs.ansible.com/ansible/latest/collections/community/docker/index.html
+# - community.general # https://docs.ansible.com/ansible/latest/collections/community/general/index.html
+
+# - src: ironicbadger.hddtemp # https://github.com/ironicbadger/ansible-role-hddtemp
+# - src: geerlingguy.docker_arm
+# - src: ironicbadger.proxmox_nag_removal
+# https://github.com/ironicbadger/ansible-role-apprise-boot-notification
+# - src: ironicbadger.apprise_boot_notification
+# https://github.com/IronicBadger/ansible-role-snapraid
+# - src: ironicbadger.snapraid
+# https://github.com/ironicbadger/ansible-role-figurine
+# - src: ironicbadger.figurine
+# https://github.com/geerlingguy/ansible-role-ntp
+# - src: geerlingguy.ntp
+# https://github.com/geerlingguy/ansible-role-github-users
+# - src: geerlingguy.github-users
+# https://github.com/ironicbadger/ansible-role-docker-compose-generator
+# - src: ironicbadger.docker_compose_generator
+# https://github.com/IronicBadger/ansible-role-bash-aliases
+# - src: ironicbadger.bash_aliases
+
+# - src: ironicbadger.ansible_role_create_users
+# - src: ironicbadger.ansible_role_nginx_configs
+# - src: ironicbadger.ansible_users
+# - src: ssh://git@git.ktz.me:2222/alexktz/ansible-role-ktz-rh-vpn.git
+#   scm: git
+#   name: ktz-rh-vpn
+# - src: ssh://git@git.ktz.me:2222/alexktz/ansible-role-ktz-apcupsd.git
+#   scm: git
+#   name: ktz-apcupsd

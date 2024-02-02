@@ -1,0 +1,23 @@
+---
+- name: Systemd daemon-reload
+  ansible.builtin.command: systemctl daemon-reload
+- name: Start samba service
+  ansible.builtin.service:
+    name: smbd
+    state: started
+
+- name: Restart samba service
+  ansible.builtin.service:
+    name: smbd
+    state: restarted
+
+- name: Restart telegraf
+  ansible.builtin.service:
+    name: telegraf
+    state: restarted
+
+- name: Reload docker
+  ansible.builtin.service:
+    name: docker
+    daemon_reload: true
+    state: restarted

@@ -1,0 +1,16 @@
+---
+- name: Arch specific setup
+  ansible.builtin.include_tasks: arch-linux.yml
+  when: ansible_distribution == 'Archlinux'
+
+- name: Apprise.yml
+  ansible.builtin.include_tasks: apprise.yml
+  
+- name: Install script that cron will execute
+  ansible.builtin.template:
+    src: booted.sh.j2
+    dest: /root/booted.sh
+    owner: root
+    group: root
+    mode: "700"
+

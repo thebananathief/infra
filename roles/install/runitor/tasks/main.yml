@@ -1,0 +1,69 @@
+---
+- name: get status of runitor_install_path
+  stat:
+    path: "{{ runitor_install_path }}"
+  register: is_installed
+
+- name: set runitor installed
+  set_fact:
+    runitor_is_installed: "{{ is_installed.stat.exists }}"
+
+- name: check runitor version
+  shell: "{{ runitor_install_path }} --version | awk '{ print $2 }' | cut -c 2-"
+  changed_when: false
+  register: installed_version_registered
+  when: runitor_is_installed == True
+
+- name: get latest release
+  uri:
+    url: https://api.github.com/repos/bdd/runitor/releases/latest
+    url_username: "{{ github_api_user | default (omit) }}"
+    url_password: "{{ github_api_pass | default (omit) }}"
+    return_content: true
+    force_basic_auth: "{{ github_api_auth | default (omit) }}"
+  register: release_version_registered
+  when: runitor_download_latest_ver == True
+
+- name: set runitor version (latest)
+  set_fact:
+    runitor_ver: "{{ release_version_registered.json.tag_name|regex_replace('v') }}"
+  when: runitor_download_latest_ver == True
+
+- name: set runitor version (pinned)
+  set_fact:
+    runitor_ver: "{{ runitor_pinned_ver }}"
+  when: runitor_download_latest_ver == False
+
+- block:
+    - name: ensure runitor_download_directory does not exist
+      file:
+        path: "{{ runitor_download_directory }}"
+        state: absent
+
+    - name: create runitor_download_directory
+      file:
+        path: "{{ runitor_download_directory }}"
+        state: directory
+        mode: 0755
+
+    - name: download runitor
+      get_url:
+        url: "{{ runitor_gh_url }}/v{{ runitor_ver }}/runitor-v{{ runitor_ver }}-{{ runitor_distro }}"
+        dest: "{{ runitor_download_directory }}"
+        force: yes
+        owner: root
+        group: root
+        mode: +x
+
+    - name: move to /usr/local/bin
+      shell: "mv {{ runitor_download_directory }}/runitor-v{{ runitor_ver }}-{{ runitor_distro }} {{ runitor_install_path }}"
+
+  when: runitor_is_installed == False or ( runitor_is_installed == True and runitor_download_latest_ver == True and installed_version_registered.stdout != runitor_ver ) or ( runitor_is_installed == True and runitor_download_latest_ver == False and installed_version_registered.stdout != runitor_pinned_ver )
+
+- name: populate /etc/environment
+  lineinfile:
+    dest: "/etc/environment"
+    state: present
+    regexp: "^HC_API_URL="
+    line: "HC_API_URL={{ runitor_url }}"
+  when: runitor_is_installed == False

@@ -1,0 +1,13 @@
+---
+- name: Clone snapraid-runner
+  ansible.builtin.git:
+    repo: https://github.com/Chronial/snapraid-runner.git
+    dest: /opt/snapraid-runner
+
+- name: Install snapraid-runner configuration file
+  ansible.builtin.template:
+    src: snapraid-runner.conf.j2
+    dest: "{{ snapraid_runner_conf }}"
+    owner: root
+    group: root
+    mode: "0775"

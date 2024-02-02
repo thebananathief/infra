@@ -1,0 +1,243 @@
+---
+download_path: /mnt/disk1/downloads
+# download_path: /mnt/storage/downloads
+storage_path: /mnt/storage
+
+# artis3n.tailscale
+tailscale_args: --advertise-routes=192.168.0.0/24
+
+# blp-config
+# These are server-specific aliases, the convenience ones will be added through the shell-setup script
+bash_aliases:
+  - { alias: dtail, command: "docker logs -tf --tail='50' " }
+  - { alias: dstop, command: docker stop `docker ps -aq` }
+  - { alias: drm, command: docker rm `docker ps -aq` }
+  # - { alias: drem, command: docker stop $1 && docker rm $1 }
+  - { alias: dcp, command: "docker compose -f ~/docker-compose.yml " }
+  - { alias: edcp, command: vi ~/docker-compose.yml }
+  - { alias: dprune, command: docker image prune }
+  - { alias: dclean, command: docker system prune --all }
+  - {
+      alias: dps,
+      command: "docker ps --format 'table {{ '{{' }}.Names{{ '}}' }}\\t{{ '{{' }}.Ports{{ '}}' }}\\t{{ '{{' }}.Status{{ '}}' }}'",
+    }
+  - {
+      alias: bashreload,
+      command: source ~/.bashrc && echo Bash config reloaded;,
+    }
+  - { alias: appd, command: "cd {{ appdata_path }}" }
+  # - { alias: "dtop", command: "docker run --name ctop  -it --rm -v /var/run/docker.sock:/var/run/docker.sock quay.io/vektorlab/ctop"}
+  # - { alias: "sshclear", command: "rm ~/.ssh/multiplex/* -f && echo SSH connection cache cleared;"}
+  # - { alias: "sshlist", command: "echo Currently open ssh connections && echo && l ~/.ssh/multiplex/"}
+  # - { alias: "dfclean", command: "df -h -x tmpfs -x zfs -t fuse.mergerfs -t xfs -t ext4"}
+  # - { alias: "dfzfs", command: "df -h -x tmpfs -t fuse.mergerfs -t xfs -t ext4 -t zfs"}
+  # - { alias: "hdtemp", command: "sudo hddtemp -q /dev/sd[a,b,c,d,e]" }
+  # - { alias: "nvmetemp", command: "for i in {0..3}; do nvme smart-log /dev/nvme'$i'n1 | grep temperature; done;" }
+
+# SSH keys, public and private
+ssh_authorized_keys:
+  - key: "{{ sshPub_phone }}"
+  - key: "{{ sshPub_desktop }}"
+  - key: "{{ sshPub_laptop }}"
+ssh_private_keys:
+  - { name: github, key: "{{ ssh_github }}" }
+
+# grog.package
+package_list:
+  - name: mergerfs
+  - name: sudo
+  - name: curl
+  - name: git
+  - name: wget
+  - name: net-tools # netstat, ifconfig, arp, rarp, nameif, route
+  - name: dnsutils # dig, nslookup, nsupdate
+  - name: intel-gpu-tools
+  - name: lm-sensors
+  - name: smartmontools
+  - name: neofetch
+  - name: neovim
+  - name: htop
+  - name: iftop
+  - name: iotop
+  - name: nmap
+  - name: python3
+  - name: python3-pip
+  - name: openssh-server # sshd
+  - name: bash-completion
+  - name: tmux
+  - name: tree
+  - name: xfsprogs
+
+# - name: hddtemp
+# - name: screen
+# - name: mc # midnight commander (file browser)
+# - name: ncdu # essentially windirstat
+# - name: nfs-kernel-server
+# - name: fio # io tester / benchmark tool
+# - name: mutt # mail user agent
+# - name: open-vm-tools # vmware tools
+# - name: qemu-guest-agent # vm tools for qemu
+
+# dj-wasabi.telegraf https://github.com/dj-wasabi/ansible-telegraf
+# https://docs.influxdata.com/telegraf/v1.26/plugins/
+telegraf_plugins_default:
+  - plugin: system
+    config:
+      - fieldpass = ["load1", "load5", "load15", "uptime_format"]
+  - plugin: mem
+    config:
+      - fieldpass = ["used_percent"]
+  - plugin: cpu
+    config:
+      - percpu = false
+      - tagexclude = ["cpu"]
+      - fieldpass = ["usage_user", "usage_system"]
+  - plugin: disk
+    config:
+      - mount_points = ["/","/mnt/disk1","/mnt/disk2","/mnt/disk3","/mnt/disk4","/mnt/storage"]
+      - fieldpass = ["used_percent"]
+      - tagexclude = ["mode"]
+  - plugin: net
+    config:
+      - interfaces = ["enp5s0"]
+      - ignore_protocol_stats = true
+      - fieldpass = ["bytes_recv", "bytes_sent", "packets_recv", "packets_sent"]
+  - plugin: sensors
+    config:
+      - fieldpass = ["temp_input", "temp_max"]
+  - plugin: docker
+    config:
+      - perdevice = false
+      - total = true
+      - total_include = ["cpu"]
+      - docker_label_exclude = ["*"]
+      - namepass = ["docker_container_cpu", "docker_container_mem"]
+      - fieldpass = ["usage_percent"]
+      - tagexclude = ["container_version", "server_version", "engine_host"]
+# - plugin: http
+#   config:
+#     - urls = ["https://api.steampowered.com/IGameServersService/GetServerList/v1/?key=79F209384239AC84837D57EDBBB0FFAD&filter=addr\\205.178.177.5:27015"]
+#     - data_format = "json"
+#     - fieldpass = ["*players"]
+
+# geerlingguy.security
+security_ssh_port: "{{ ssh_port }}"
+security_ssh_allowed_users:
+  - "{{ main_username }}"
+security_sudoers_passwordless:
+  - "{{ main_username }}"
+
+# blp-snapraid
+snapraid_runner: true
+snapraid_runner_email_address: "{{ email_address }}"
+snapraid_runner_email_pass: "{{ gmail_password }}"
+snapraid_runner_email_sendon: error
+snapraid_runner_touch: false
+snapraid_runner_healthcheck_io_uuid: "{{ healthcheck_snapraid_uuid }}"
+
+snapraid_config_excludes:
+  - "*.unrecoverable"
+  - /tmp/
+  - /lost+found/
+  - appdata/
+  - downloads/
+  - "*.!sync"
+  - .AppleDouble
+  - ._AppleDouble
+  - .DS_Store
+  - ._.DS_Store
+  - .Thumbs.db
+  - .fseventsd
+  - .Spotlight-V100
+  - .TemporaryItems
+  - .Trashes
+  - .AppleDB
+  - .nfo
+
+# blp-talos + blp-snapraid
+snapraid_parity_disks:
+  # /dev/disk/by-id/ata-WDC_WD80EAZZ-00BKLB0_WD-CA1BM2SK-part1
+  - {
+      source: UUID=a0f9bda4-acf6-4c9e-af77-8d11c7a10741,
+      path: /mnt/parity1,
+      fs: xfs,
+      opts: defaults,
+      content: true,
+    }
+
+snapraid_data_disks:
+  # /dev/disk/by-id/ata-WDC_WD30EZRS-11J99B1_WD-WCAWZ1993819-part1
+  - {
+      source: UUID=16165a4b-d650-4a84-a55d-9db8f83d0271,
+      path: /mnt/disk1,
+      fs: ext4,
+      opts: defaults,
+      content: true,
+    }
+  # /dev/disk/by-id/ata-WDC_WD80EAZZ-00BKLB0_WD-CA2ENKSL-part1
+  - {
+      source: UUID=cec3736e-cfa9-40e4-8143-02b338cd75e9,
+      path: /mnt/disk2,
+      fs: xfs,
+      opts: defaults,
+      content: true,
+    }
+  # /dev/disk/by-id/ata-TOSHIBA_DT01ACA200_X4V224ZTS-part1
+  - {
+      source: UUID=bb0b2728-3662-4fef-b862-5f1be6d54172,
+      path: /mnt/disk3,
+      fs: ext4,
+      opts: defaults,
+      content: false,
+    }
+  # /dev/disk/by-id/ata-????
+  # - { source: UUID=db4a98ac-3a13-4a49-a40e-10a06f2db023, path: /mnt/disk4, fs: xfs, opts: defaults, content: false }
+
+fstab_mergerfs:
+  - source: /mnt/disk*:/mnt/tank/fuse
+    path: /mnt/storage
+    fs: fuse.mergerfs
+    opts: defaults,nonempty,allow_other,category.create=epmfs,use_ino,moveonenospc=true,dropcacheonclose=true,minfreespace=50G,fsname=mergerfs
+
+# cronjobs
+cronjobs:
+  - name: Booted! notification # make sure roles/boot-notify gets ran
+    job: /bin/bash /root/booted.sh
+    special_time: reboot
+
+  - name: Server uptime healthcheck
+    job: curl -fsS -m 10 --retry 5 -o /dev/null https://hc-ping.com/{{ healthcheck_uptime_uuid }}
+    minute: "*/15"
+
+  - name: Snapraid-runner # make sure roles/install/snapraid gets ran
+    job: "{{ snapraid_runner_command }}"
+    weekday: "*"
+    hour: "4"
+    minute: "0"
+
+# blp-traefik
+traefik_file_provider: false
+traefik_enable_dashboard: false
+traefik_insecure_transport: false
+traefik_exposed_by_default: false
+traefik_log_level: info
+
+# blp-authelia
+authelia_url: login.{{ main_domain }}
+authelia_users:
+  - username: "{{ ansible_user }}"
+    displayname: Cameron
+    # docker run --rm authelia/authelia:latest authelia hash-password 'yourpassword'
+    password: "{{ authelia_password }}"
+    email: "{{ email_address }}"
+    groups:
+      - everyone
+authelia_rules:
+  - domain: "*.{{ main_domain }}"
+    policy: one_factor
+  # - domain: "*.{{ main_domain }}"
+  #   resources:
+  #     - '^/api.*$'
+  #   policy: bypass
+  # - domain: "login.{{ main_domain }}"
+  #   policy: bypass

@@ -1,0 +1,13 @@
+---
+###
+- service_name: librespeed
+  active: false
+  image: linuxserver/librespeed
+  ports:
+    - 8080:80
+  environment:
+    - MODE=standalone
+    - TELEMETRY=true
+    - PASSWORD=test123
+  include_global_env_vars: true
+  restart: unless-stopped

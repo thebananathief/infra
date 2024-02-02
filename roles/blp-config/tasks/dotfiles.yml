@@ -1,0 +1,50 @@
+---
+# Copy private github key to server and add it to ssh-agent
+- name: Copy ssh key for github
+  ansible.builtin.copy:
+    src: github_ed25519
+    dest: "{{ home_path }}/.ssh/"
+    owner: "{{ main_uid }}"
+    group: "{{ main_gid }}"
+    mode: "0600"
+
+- name: Copy ssh config
+  ansible.builtin.copy:
+    src: config
+    dest: "{{ home_path }}/.ssh/"
+    owner: "{{ main_uid }}"
+    group: "{{ main_gid }}"
+
+# If already cloned, pull instead and run setup.sh
+
+# TODO: REST IS BROKEN, DO IT MANUALLY
+
+# - name: add ssh key to ssh-agent
+#   shell: |
+#     set timeout 300
+#     eval $(ssh-agent)
+#     ssh-add {{ home_path }}/.ssh/github_ed25519
+#     exit 0
+
+# Download and run shell-setup
+# - name: download shell-setup
+#   git:
+#     repo: github:thebananathief/shell-setup.git
+#     dest: "{{ home_path }}/github/shell-setup"
+# maybe use key_file: ? https://docs.ansible.com/ansible/latest/collections/ansible/builtin/git_module.html
+
+# - name: modify perms on shell-setup
+#   file:
+#     path: "{{ home_path }}/github/shell-setup/setup.sh"
+#     owner: "{{ main_uid }}"
+#     group: "{{ main_gid }}"
+#     mode: 0740
+
+# - name: install shell-setup
+# become: true
+# command: '{{ home_path }}/github/shell-setup/setup.sh'
+# shell: |
+#   set timeout 500
+#   cd ~/github/shell-setup
+#   ./setup.sh
+#   exit 0

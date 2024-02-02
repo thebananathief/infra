@@ -1,0 +1,14 @@
+---
+- name: Diun | Ensure appdata path exists
+  file:
+    path: "{{ appdata_path }}/diun"
+    state: directory
+    user: "{{ main_username }}"
+    group: "{{ main_username }}"
+
+- name: Diun | Create config
+  template:
+    src: diun_config.yml.j2
+    dest: "{{ appdata_path }}/diun/config.yml"
+    user: "{{ main_username }}"
+    group: "{{ main_username }}"

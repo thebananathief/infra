@@ -1,0 +1,73 @@
+---
+- name: config-ssh | Update authorized_keys
+  authorized_key:
+    user: "{{ item.user | default (main_username) }}"
+    state: "{{ item.state | default ('present') }}"
+    key: "{{ item.key }}"
+  loop: "{{ ssh_authorized_keys }}"
+
+- name: config-ssh | Add private keys
+  copy:
+    dest: /home/{{ item.user }}/.ssh/{{ item.name }}
+    content: "{{ item.key }}"
+    owner: "{{ item.user | default (main_username) }}"
+    group: "{{ item.user | default (main_username) }}"
+    mode: 0600
+  loop: "{{ ssh_private_keys }}"
+
+# - name: config-ssh | Add GitHub SSH Key
+#   copy:
+#     dest: /home/{{ main_username }}/.ssh/github
+#     content: "{{ ssh_github }}"
+#     owner: "{{ main_username }}"
+#     group: "{{ main_username }}"
+#     mode: 0600
+
+- name: config-ssh | Add ssh config
+  copy:
+    dest: /home/{{ main_username }}/.ssh/config
+    owner: "{{ main_username }}"
+    group: "{{ main_username }}"
+    mode: 0664
+    content: |
+      Host github.com
+        IdentityFile ~/.ssh/github
+
+- name: config-ssh | ssh-agent Github key
+  command: eval `ssh-agent -s` ; ssh-add /home/{{ main_username }}/.ssh/github
+  args:
+    chdir: "/home/{{ main_username }}"
+
+- name: config-ssh | git config user.name
+  community.general.git_config:
+    scope: global
+    name: user.name
+    value: "thebananathief"
+
+- name: config-ssh | git config user.email
+  community.general.git_config:
+    scope: global
+    name: user.email
+    value: "cameron.salomone@gmail.com"
+
+- name: config-ssh | git config init.defaultBranch
+  community.general.git_config:
+    scope: global
+    name: init.defaultBranch
+    value: "main"
+# - name: config-ssh | Copy Github script
+#   template:
+#     src: github.sh.j2
+#     dest: /home/{{ main_username }}/github.sh
+#     owner: "{{ main_username }}"
+#     group: "{{ main_username }}"
+#     mode: +x
+
+# - name: config-ssh | Run Github Script
+#   command: /bin/bash ./github.sh
+#   args:
+#     chdir: "/home/{{ main_username }}"
+# - name: config-ssh | Remove Github script
+#   file:
+#     path: /home/{{ main_username }}/github.sh
+#     state: absent

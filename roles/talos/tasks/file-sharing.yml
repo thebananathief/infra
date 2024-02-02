@@ -1,0 +1,17 @@
+---
+- name: Install samba
+  ansible.builtin.apt:
+    pkg: samba
+    state: present
+  notify:
+    - Start samba service
+
+- name: Install samba config
+  ansible.builtin.copy:
+    src: smb.conf
+    dest: /etc/samba/smb.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Restart samba service

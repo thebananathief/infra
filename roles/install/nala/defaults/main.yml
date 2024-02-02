@@ -1,0 +1,3 @@
+---
+nala_system_bin_path: /usr/bin
+nala_binary_path: "{{ nala_system_bin_path }}/nala"

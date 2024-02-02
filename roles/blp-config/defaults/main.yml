@@ -1,0 +1,5 @@
+---
+apt_upgrade: false
+mute_motd: true
+home_path: /home/{{ ansible_user }}
+setup_github_ssh: true

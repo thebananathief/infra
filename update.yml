@@ -1,0 +1,31 @@
+---
+- hosts: talos
+  vars_files:
+    - vars/secrets.yml
+  become: true
+  gather_facts: false
+  # vars_prompt:
+  #   - name: containers_to_update
+  #     prompt: Which containers?
+  #     private: no
+  tasks:
+    - name: Update all packages
+      become: true
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 86400
+        upgrade: true
+        autoremove: true
+
+    - name: Docker Pull
+      ansible.builtin.command: docker compose pull
+      args:
+        chdir: /home/{{ main_username }}/
+
+    - name: Docker Update
+      ansible.builtin.command: docker compose up -d
+      args:
+        chdir: /home/{{ main_username }}/
+
+    - name: Docker Prune
+      ansible.builtin.command: docker system prune --volumes -f

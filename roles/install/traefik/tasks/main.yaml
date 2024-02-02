@@ -1,0 +1,31 @@
+---
+- name: Ensure target dir exists
+  ansible.builtin.file:
+    dest: "{{ appdata_path }}/traefik/"
+    state: directory
+    owner: "{{ main_uid }}"
+    group: "{{ main_gid }}"
+
+- name: Template traefik config
+  ansible.builtin.template:
+    src: templates/traefik.yml.j2
+    dest: "{{ appdata_path }}/traefik/traefik.yml"
+    owner: "{{ main_uid }}"
+    group: "{{ main_gid }}"
+  tags: traefik
+
+- name: Ensure dynamic dir exists
+  ansible.builtin.file:
+    dest: "{{ appdata_path }}/traefik/dynamic"
+    state: directory
+    owner: "{{ main_uid }}"
+    group: "{{ main_gid }}"
+
+- name: Copy traefik rules
+  ansible.builtin.template:
+    src: templates/rules.yml.j2
+    dest: "{{ appdata_path }}/traefik/dynamic/rules.yml"
+    owner: "{{ main_uid }}"
+    group: "{{ main_gid }}"
+  when: traefik_file_provider
+  tags: traefik

@@ -1,0 +1,28 @@
+---
+# Create and source bash aliases
+- name: Setup Bash aliases
+  ansible.builtin.lineinfile:
+    dest: /etc/bash_aliases
+    create: true
+    line: alias {{ item.alias }}="{{ item.command }}"
+    regexp: ^alias {{ item.alias }}=
+    owner: root
+    group: root
+    mode: "0644"
+  with_items: "{{bash_aliases}}"
+
+- name: Source aliases file
+  ansible.builtin.lineinfile:
+    dest: /etc/bash.bashrc
+    line: source /etc/bash_aliases
+    state: present
+
+- name: Source aliases file for user
+  ansible.builtin.lineinfile:
+    dest: "{{ home_path }}/.profile"
+    create: true
+    line: source /etc/bash_aliases
+    state: present
+    owner: "{{ main_uid }}"
+    group: "{{ main_gid }}"
+    mode: "0700"

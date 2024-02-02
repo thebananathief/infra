@@ -1,0 +1,25 @@
+---
+- name: Apt update and upgrade
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 86400
+    upgrade: true
+    autoremove: true
+  when: apt_upgrade
+
+- name: Mute login messages
+  ansible.builtin.file:
+    # path: "/home/{{ main_username }}/.hushlogin"
+    path: "{{ home_path }}/.hushlogin"
+    state: touch
+    owner: "{{ main_uid }}"
+    group: "{{ main_gid }}"
+    mode: "0700"
+  when: mute_motd
+# - name: Setup authorized_keys, github ssh
+#   ansible.builtin.include_tasks: dotfiles.yml
+#   tags: ssh
+
+# - name: Setup bash, prompt, common aliases
+#   ansible.builtin.include_tasks: dotfiles.yml
+#   tags: bash

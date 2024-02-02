@@ -1,0 +1,57 @@
+---
+- hosts: talos
+  vars_files:
+    - vars/secrets.yml
+    - vars/liveContainers.yml
+  become: true
+  roles:
+    - role: grog.package
+    # - role: artis3n.tailscale
+    - role: blp-config
+    - role: bash-aliases
+      tags: bash
+    - role: weareinteractive.environment
+    - role: boot-notify
+    - role: cronjobs
+    - role: install/figurine
+    - role: geerlingguy.security
+    - role: install/telegraf
+      tags: telegraf
+    - role: geerlingguy.docker
+    - role: blp-docker-compose-generator
+      tags: compose
+    - role: install/traefik
+      tags: compose
+    # - role: install/authelia
+    #   tags: compose
+    - role: install/snapraid
+      tags: [snapraid, disks]
+    - role: talos
+    - role: install/nala
+      tags: [nala, never]
+    - role: blp-testground
+      tags: [test, never]
+
+- hosts: talosdev
+  vars_files:
+    - vars/secrets.yml
+  become: true
+  roles:
+    - role: blp-config # hostname, apt upgrade, hush login msg, shell-setup, bash-aliases
+    - role: grog.package
+    - role: weareinteractive.environment
+    - role: boot-notify
+    - role: cronjobs
+    - role: install/figurine
+    - role: bash-aliases
+      tags: bash
+    # - role: blp-nala
+    # - role: ironicbadger.hddtemp
+    # - role: rossmcdonald.telegraf
+    # - role: geerlingguy.security
+    - role: geerlingguy.docker
+    # - role: blp-talos # create mntpoints, setup fstab but don't mount, samba fileshares, add telegraf to docker group
+    - role: blp-docker-compose-generator
+      tags: compose
+    - role: blp-testground
+      tags: [test, never]

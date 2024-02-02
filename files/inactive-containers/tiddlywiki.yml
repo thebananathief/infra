@@ -1,0 +1,13 @@
+---
+###
+- service_name: tiddlywiki
+  active: false
+  image: mazzolino/tiddlywiki
+  volumes:
+    - "{{ appdata_path }}/tiddlywiki:/var/lib/tiddlywiki"
+  ports:
+    - 8080:8080
+  environment:
+    - USERNAME=dungeon
+    - PASSWORD=bois
+  restart: unless-stopped

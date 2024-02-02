@@ -1,0 +1,611 @@
+---
+# blp-docker_compose_generator
+networks:
+  - network_name: public_access
+    external: true
+  - network_name: database_only
+    internal: true
+
+containers:
+  ###
+  - service_name: traefik
+    active: true
+    image: traefik:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - "{{ appdata_path }}/traefik:/etc/traefik" # Set acme.json file to chmod 600 - make sure its not a dir
+    ports:
+      - 80:80
+      - 443:443
+      - 8080:8080
+      # - 64738:64738
+      # - 64738:64738/udp
+    # extra_hosts: # https://doc.traefik.io/traefik/providers/docker/#host-networking
+    #   - host.docker.internal:172.18.0.1
+    networks:
+      - public_access
+    environment:
+      - CLOUDFLARE_EMAIL={{ email_address }}
+      - CLOUDFLARE_API_KEY={{ cloudflare_api }}
+    # command:
+  # - "--entrypoints.mumble_tcp.address=:64738"
+  # - "--entrypoints.mumble_udp.address=:64738/udp"
+  # - "--certificatesresolvers.cloudflare.acme.caserver=https://acme-v02.api.letsencrypt.org/directory"
+  ###
+  - service_name: authelia
+    active: false
+    image: authelia/authelia
+    networks:
+      - public_access
+    environment:
+      - TZ={{ ntp_timezone }}
+    volumes:
+      - "{{ appdata_path }}/authelia:/config"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.authelia.rule=Host(`{{ authelia_url }}`)
+      - traefik.http.routers.authelia.entrypoints=websecure
+      - traefik.http.services.authelia.loadbalancer.server.port=9091
+  ###
+  - service_name: who
+    active: false
+    image: containous/whoami
+    networks:
+      - public_access
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.who.rule=Host(`who.{{ main_domain }}`)
+      - traefik.http.routers.who.entrypoints=websecure
+      - traefik.http.routers.who.middlewares=authelia@file
+  ### https://hub.docker.com/r/dtjs48jkt/webtrees/
+  - service_name: webtrees
+    active: true
+    image: dtjs48jkt/webtrees:latest
+    environment:
+      - DB_USER=root
+      - DB_PASSWORD={{ mysql_password }}
+      - DB_HOST=mysql
+      - DB_PORT=3306
+      - DB_NAME=general # TODO migrate "general" to "webtrees" (db name)
+      - WT_ADMIN=thebananathief
+      - WT_ADMINMAIL={{ email_address }}
+      - WT_ADMINPW={{ webtrees_password }}
+      - GROUP_ID={{ main_gid }}
+      - PORT=8079
+      - DISABLE_SSL=TRUE
+      - PRETTYURLS=TRUE
+      - BASE_URL=https://tree.{{ main_domain }}
+    depends_on:
+      - mysql
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - "{{ appdata_path }}/webtrees/data:/var/www/html/data"
+      - "{{ appdata_path }}/webtrees/modules:/var/www/html/modules_v4"
+    networks:
+      - public_access
+      - database_only
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.webtrees.loadbalancer.server.port=8079
+      - traefik.http.routers.webtrees.rule=Host(`tree.{{ main_domain }}`)
+      - traefik.http.routers.webtrees.entrypoints=websecure
+  # user: "{{ main_uid }}:{{ main_gid }}"
+  ###
+  - service_name: overseerr
+    active: true
+    image: lscr.io/linuxserver/overseerr:latest
+    networks:
+      - public_access
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.overseerr.rule=Host(`request.{{ main_domain }}`)
+      - traefik.http.routers.overseerr.entrypoints=websecure
+    volumes:
+      - "{{ appdata_path }}/overseerr:/config"
+    include_global_env_vars: true
+  ### integrate with https://filebrowser.org/
+  - service_name: static
+    active: true
+    image: nginx:alpine
+    networks:
+      - public_access
+    volumes:
+      - "{{ storage_path }}/filebrowser:/usr/share/nginx/html:ro"
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.static.rule=Host(`static.{{ main_domain }}`)
+      - traefik.http.routers.static.entrypoints=websecure
+  ###
+  - service_name: filebrowser
+    active: true
+    image: filebrowser/filebrowser
+    volumes:
+      - "{{ storage_path }}/filebrowser:/srv"
+      - type: bind
+        source: "{{ appdata_path }}/filebrowser/database.db"
+        target: /database/filebrowser.db
+      - type: bind
+        source: "{{ appdata_path }}/filebrowser/.filebrowser.json"
+        target: /.filebrowser.json
+    networks:
+      - public_access
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.filebrowser.rule=Host(`files.{{ main_domain }}`)
+      - traefik.http.routers.filebrowser.entrypoints=websecure
+    user: "{{ main_uid }}:{{ main_gid }}"
+  ###
+  - service_name: rss
+    active: true
+    image: wangqiru/ttrss:latest
+    volumes:
+      - "{{ appdata_path }}/ttrss/feed-icons:/var/www/feed-icons/"
+    environment:
+      - SELF_URL_PATH=https://rss.{{ main_domain }}/
+      - PUID=1000
+      - PGID=1000
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=postgres
+      - DB_PASS={{ postgres_password }}
+    networks:
+      - public_access
+      - database_only
+    depends_on:
+      - postgres
+    stdin_open: true
+    tty: true
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.rss.rule=Host(`rss.{{ main_domain }}`)
+      - traefik.http.routers.rss.entrypoints=websecure
+  ### https://hub.docker.com/r/linuxserver/plex/
+  - service_name: plex
+    active: true
+    image: lscr.io/linuxserver/plex:latest
+    volumes:
+      - "{{ appdata_path }}/plex:/config"
+      - "{{ storage_path }}/media:/media"
+      - /etc/localtime:/etc/localtime:ro
+    network_mode: host
+    devices:
+      - /dev/dri:/dev/dri
+    environment:
+      - PLEX_CLAIM="nope"
+      - VERSION=docker
+    include_global_env_vars: true
+  ###
+  - service_name: jellyfin
+    active: true
+    image: jellyfin/jellyfin # lscr.io/linuxserver/jellyfin:latest
+    volumes:
+      # - "{{ appdata_path }}/jellyfin-web-dv:/usr/share/jellyfin/web:ro"
+      - "{{ appdata_path }}/jellyfin:/config"
+      - "{{ storage_path }}/media:/data"
+      - /dev/shm:/transcode # ram transcode
+    ports:
+      - 8096:8096
+      # - 8920:8920      #Optional - Https webUI (you need to set up your own certificate).
+      - 7359:7359/udp  #Optional - Allows clients to discover Jellyfin on the local network.
+      - 1900:1900/udp  #Optional - Service discovery used by DNLA and clients.
+    networks:
+      - public_access
+    devices:
+      - /dev/dri:/dev/dri
+    # environment:
+    #   - JELLYFIN_PublishedServerUrl=watch.{{ main_domain }} #optional
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.services.jellyfin.loadbalancer.server.port=8096
+    #   - traefik.http.routers.jellyfin.rule=Host(`watch.{{ main_domain }}`)
+    #   - traefik.http.routers.jellyfin.entrypoints=websecure
+    include_global_env_vars: true
+  ###
+  - service_name: radarr
+    active: true
+    image: lscr.io/linuxserver/radarr:latest
+    volumes:
+      - "{{ appdata_path }}/radarr:/config"
+      - "{{ storage_path }}:/storage"
+    ports:
+      - 7878:7878
+    include_global_env_vars: true
+  ###
+  - service_name: sonarr
+    active: true
+    image: lscr.io/linuxserver/sonarr:latest
+    volumes:
+      - "{{ appdata_path }}/sonarr:/config"
+      - "{{ storage_path }}:/storage"
+    ports:
+      - 8989:8989
+    include_global_env_vars: true
+  ###
+  - service_name: hedgedoc
+    active: true
+    image: lscr.io/linuxserver/hedgedoc:latest
+    volumes:
+      - "{{ appdata_path }}/hedgedoc:/config"
+    # ports:
+    #   - 3000:3000
+    networks:
+      - public_access
+      - database_only
+    environment:
+      - "DB_HOST=mysql"
+      - DB_PORT=3306
+      - DB_USER=root
+      - "DB_PASS={{ mysql_password }}"
+      - DB_NAME=hedgedoc
+      - "CMD_DOMAIN=notes.{{ main_domain }}"
+      - CMD_PROTOCOL_USESSL=true #optional
+      # - CMD_URL_ADDPORT=false #optional
+      # - CMD_PORT=3000 #optional
+      # - CMD_ALLOW_ORIGIN=['localhost'] #optional
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.hedgedoc.rule=Host(`notes.{{ main_domain }}`)
+      - traefik.http.routers.hedgedoc.entrypoints=websecure
+      - traefik.http.services.hedgedoc.loadbalancer.server.port=3000
+    include_global_env_vars: true
+  ###
+  - service_name: whisparr
+    active: false
+    image: hotio/whisparr:latest
+    volumes:
+      - "{{ appdata_path }}/whisparr:/config"
+      - "{{ storage_path }}:/storage"
+    ports:
+      - 6969:6969
+    include_global_env_vars: true
+  ###
+  - service_name: dashy
+    active: true
+    image: lissy93/dashy:latest
+    volumes:
+      - "{{ appdata_path }}/dashy/config.yml:/app/public/conf.yml"
+      - "{{ appdata_path }}/dashy/logos:/app/public/item-icons"
+    ports:
+      - 8081:80
+    environment:
+      - NODE_ENV=production
+      - UID={{ main_uid }}
+      - GID={{ main_gid }}
+    healthcheck:
+      test: [CMD, node, /app/services/healthcheck]
+      interval: 1m30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  ### https://github.com/Theofilos-Chamalis/mumble-web
+  - service_name: mumble
+    active: true
+    image: mumblevoip/mumble-server:latest
+    # labels: # https://github.com/PHLAK/docker-mumble/issues/15
+    #   - "traefik.enable=true"
+    #   - "traefik.udp.routers.mumble.entrypoints=mumble_udp"
+    #   - "traefik.udp.routers.mumble.service=mumble"
+    #   - "traefik.udp.services.mumble.loadbalancer.server.port=64738"
+
+    #   - "traefik.tcp.routers.mumble.entrypoints=mumble_tcp"
+    #   - "traefik.tcp.routers.mumble.service=mumble"
+    #   - "traefik.tcp.routers.mumble.rule=HostSNI(`mumble.{{ main_domain }}`)"
+    #   - "traefik.tcp.services.mumble.loadbalancer.server.port=64738"
+    #   - "traefik.tcp.routers.mumble.tls.passthrough=true"
+    # networks:
+    #   - public_access
+    environment:
+      - MUMBLE_CONFIG_WELCOMETEXT=Welcome to the Shire! Have a grand time and don't disturb the hobbits!
+      # - MUMBLE_SUPERUSER_PASSWORD=password123
+    ports:
+      - 64738:64738
+    volumes:
+      - "{{ appdata_path }}/mumble:/data"
+    restart: unless-stopped
+  ###
+  - service_name: transmission
+    active: true
+    image: haugene/transmission-openvpn:latest
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - "{{ download_path }}:/data"
+    ports:
+      - 9092:9091
+    environment:
+      - PUID={{ main_uid }}
+      - PGID={{ main_gid }}
+      - OPENVPN_PROVIDER=NORDVPN
+      - NORDVPN_COUNTRY=US
+      - NORDVPN_CATEGORY=legacy_p2p
+      - OPENVPN_USERNAME={{ nordvpn_user }}
+      - OPENVPN_PASSWORD={{ nordvpn_pass }}
+      - OPENVPN_OPTS=--inactive 3600 --ping 10 --ping-exit 60
+      - LOCAL_NETWORK=192.168.0.0/24
+  #      - TRANSMISSION_WEB_UI=combustion
+  ###
+  - service_name: prowlarr
+    active: true
+    image: lscr.io/linuxserver/prowlarr:latest
+    volumes:
+      - "{{ appdata_path }}/prowlarr:/config"
+    ports:
+      - 9696:9696
+    include_global_env_vars: true
+  ### https://hub.docker.com/_/influxdb/
+  - service_name: influxdb
+    active: true
+    image: influxdb:alpine
+    ports:
+      - 8086:8086
+    environment:
+      - DOCKER_INFLUXDB_INIT_MODE=setup
+      - DOCKER_INFLUXDB_INIT_USERNAME=root
+      - DOCKER_INFLUXDB_INIT_PASSWORD={{ influx_db_pass }}
+      - DOCKER_INFLUXDB_INIT_ORG=default
+      - DOCKER_INFLUXDB_INIT_BUCKET=telegraf
+      - DOCKER_INFLUXDB_INIT_ADMIN_TOKEN={{ influx_db_token }}
+    volumes:
+      - "{{ appdata_path }}/influxdb/config:/etc/influxdb2"
+      - "{{ appdata_path }}/influxdb/data:/var/lib/influxdb2"
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:8086/health]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: "0s"
+  ### https://hub.docker.com/r/grafana/grafana/ - TODO: Grafana needs to be configured for mysql (/etc/grafana/grafana.ini)
+  ### Manually chown its volume to 472:0
+  - service_name: grafana
+    active: true
+    image: grafana/grafana-oss:latest
+    ports:
+      - 3030:3000
+    # environment:
+    #   - "GF_INSTALL_PLUGINS=put plugin names or url to zips here"
+    volumes:
+      - "{{ appdata_path }}/grafana/data:/var/lib/grafana:rw"
+      - "{{ appdata_path }}/grafana/grafana.ini:/etc/grafana/grafana.ini"
+    depends_on:
+      - mysql
+    networks:
+      - database_only
+    user: "{{ main_uid }}:{{ main_gid }}"
+  ### https://github.com/AnalogJ/scrutiny
+  - service_name: scrutiny
+    active: true
+    image: ghcr.io/analogj/scrutiny:master-omnibus
+    cap_add:
+      - SYS_RAWIO
+    ports:
+      - 8084:8080 # webapp
+    # environment: # TODO these don't work?
+    #   - SCRUTINY_SUBJECT=(%s)\ on\ device:\ (%s)
+    #   - SCRUTINY_MESSAGE=Failure\ Type:\ %s\nDevice\ Name:\ %s\nDevice\ Serial:\ %s\nDevice\ Type:\ %s\nDate:\ %s
+    volumes:
+      - /run/udev:/run/udev:ro
+      - "{{ appdata_path }}/scrutiny/config:/opt/scrutiny/config"
+      - "{{ appdata_path }}/scrutiny/influxdb:/opt/scrutiny/influxdb"
+    devices:
+      - /dev/sda
+      - /dev/sdb
+      - /dev/sdc
+      - /dev/sdd
+      # - "/dev/sde"
+      # - "/dev/sdf"
+  ### https://github.com/amir20/dozzle
+  - service_name: dozzle
+    active: true
+    image: amir20/dozzle:latest
+    ports:
+      - 8082:8080
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+  ### https://hub.docker.com/r/linuxserver/plex-meta-manager
+  # https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/
+  # https://www.themoviedb.org/settings/api
+  - service_name: plexmeta
+    active: true
+    image: lscr.io/linuxserver/plex-meta-manager:latest
+    ports:
+      - 8083:80
+    environment:
+      - PMM_CONFIG=/config/config.yml
+      - PMM_TIME=03:00
+      - PMM_RUN=False # runs immediately after startup, false will run it at the time above
+      - PMM_TEST=False # debug mode, only collections that have test: true
+      - PMM_NO_MISSING=False # run without any missing movie/show functions?
+    volumes:
+      - "{{ appdata_path }}/plexmeta:/config"
+    depends_on:
+      - plex
+    include_global_env_vars: true
+  ### https://hub.docker.com/_/mysql
+  - service_name: mysql
+    active: true
+    image: mysql
+    ports:
+      - 3306:3306
+    environment:
+      - MYSQL_ROOT_PASSWORD={{ mysql_password }}
+      # - MYSQL_DATABASE=webtrees
+    volumes:
+      - "{{ appdata_path }}/mysql:/var/lib/mysql"
+    networks:
+      - database_only
+  ### https://hub.docker.com/_/adminer
+  - service_name: adminer
+    active: false
+    image: adminer
+    ports:
+      - 8085:8080
+    networks:
+      - database_only
+  ### https://hub.docker.com/r/linuxserver/pyload-ng
+  ### https://github.com/ziahamza/webui-aria2 may be a replacement or just http://aria2.github.io/ as CLI
+  - service_name: pyload
+    active: false
+    image: lscr.io/linuxserver/pyload-ng:latest
+    volumes:
+      - "{{ download_path }}/pyload:/downloads"
+      - "{{ appdata_path }}/pyload:/config"
+    ports:
+      - 8000:8000
+      - 9666:9666 # optional
+    include_global_env_vars: true
+  ###
+  - service_name: stash
+    active: true
+    image: stashapp/stash:latest
+    volumes:
+      - "{{ storage_path }}/media/porn:/data"
+      - "{{ appdata_path }}/stash/config:/root/.stash"
+      - "{{ appdata_path }}/stash/metadata:/metadata"
+      - "{{ appdata_path }}/stash/cache:/cache"
+      - "{{ appdata_path }}/stash/blobs:/blobs"
+      - "{{ appdata_path }}/stash/generated:/generated"
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - 9999:9999
+    environment:
+      - STASH_STASH=/data/
+      - STASH_GENERATED=/generated/
+      - STASH_METADATA=/metadata/
+      - STASH_CACHE=/cache/
+      - STASH_PORT=9999
+  ###
+  - service_name: postgres
+    active: true
+    image: postgres:13-alpine
+    volumes:
+      - "{{ appdata_path }}/postgres/data/:/var/lib/postgresql/data"
+    environment:
+      - POSTGRES_PASSWORD={{ postgres_password }}
+    networks:
+      - database_only
+  ### https://hub.docker.com/r/hackebein/srcds
+  - service_name: pufferpanel
+    active: false
+    image: pufferpanel/pufferpanel:latest
+    volumes:
+      - "{{ appdata_path }}/pufferpanel:/etc/pufferpanel"
+      - "{{ storage_path }}/gameservers/pufferpanel/gmod:/var/lib/pufferpanel"
+      - /var/run/docker.sock:/var/run/docker.sock
+    network_mode: host
+    # ports:
+    #   - 8080:8080
+    #   - 5657:5657
+    #   - 27015:27015
+    # user: "{{ main_uid }}:{{ main_gid }}"
+  ### https://hub.docker.com/r/ceifa/garrysmod
+  - service_name: gmod
+    active: false
+    image: ceifa/garrysmod:debian
+    ports:
+      - 27015:27015
+      - 27005:27005/udp
+    volumes:
+      - "{{ storage_path }}/gameservers/gmod-darkrp:/home/gmod/server/garrysmod"
+    environment:
+      - PRODUCTION=0
+      - HOSTNAME="Test darkrp server"
+      - MAXPLAYERS=24
+      - GAMEMODE=sandbox
+      - MAP=gm_construct
+      - PORT=27015
+      - GSLT=B61E68BC995F555A5002D822CD66B25A
+      # - ARGS=
+  ###
+  - service_name: gmod
+    active: false
+    image: gameservermanagers/gameserver:gmod
+    volumes:
+      - "{{ storage_path }}/gameservers/gmod-darkrp:/home/gmod/server/garrysmod"
+    ports:
+      - "27015:27015/tcp"
+      - "27015:27015/udp"
+      - "27020:27020/udp"
+      - "27005:27005/udp"
+  ### https://hub.docker.com/r/kr0nus/kf2server
+  - service_name: kf2
+    active: true
+    image: kr0nus/kf2server:latest
+    volumes:
+      - "/mnt/ssd/gameservers/kf2:/data"
+    ports:
+      - "27015:27015/udp"
+      - "20560:20560/udp"
+      - "7777:7777/udp"
+      - "8078:8080/tcp"
+    environment:
+      - KF2_OPTS="KF-BurningParis?Game=ZedternalReborn.WMGameInfo_Endless?difficulty=1"
+  ### https://hub.docker.com/r/linuxserver/requestrr
+  - service_name: requestrr
+    active: true
+    image: lscr.io/linuxserver/requestrr:latest
+    ports:
+      - 4545:4545
+    volumes:
+      - "{{ appdata_path }}/requestrr:/config"
+    include_global_env_vars: true
+  ### https://hub.docker.com/r/adguard/adguardhome
+  - service_name: adguard
+    active: false
+    image: adguard/adguardhome:latest
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "853:853/tcp"
+      - "81:80/tcp"
+      - "444:443/tcp"
+      - "3000:3000/tcp"
+    volumes:
+      - "{{ appdata_path }}/adguard/conf:/opt/adguardhome/conf"
+      - "{{ appdata_path }}/adguard/work:/opt/adguardhome/work"
+    cap_add:
+      - NET_ADMIN
+  ### https://crazymax.dev/diun/install/docker/
+  - service_name: diun
+    active: false
+    image: ghcr.io/crazy-max/diun:latest
+    command: serve
+    volumes:
+      - "{{ appdata_path }}/diun:/data"
+      # - "{{ appdata_path }}/diun/config.yml:/diun.yml:ro"
+      - /var/run/docker.sock:/var/run/docker.sock
+    environment:
+      - "LOG_LEVEL=info"
+      - "LOG_JSON=false"
+      - "DIUN_WATCH_WORKERS=20"
+      - "DIUN_WATCH_SCHEDULE=0 */6 * * *"
+      - "DIUN_WATCH_JITTER=30s"
+      - "DIUN_PROVIDERS_DOCKER=true"
+      - "DIUN_PROVIDERS_DOCKER_WATCHBYDEFAULT=true"
+    include_global_env_vars: true
+
+  # template for docker-compose services
+  #
+  ###
+  # - service_name:
+  #   active: false
+  #   image:
+  #   container_name: #optional - only required if diff to service_name
+  #   labels:
+  #     - traefik.enable=true
+  #     - "traefik.http.routers.XXXXXXX.rule=Host(`abs.m.{{ local_domain }}`)"
+  #     #- traefik.http.routers.XXXXXXX.entrypoints=websecure
+  #     #- traefik.http.routers.XXXXXXX.tls.certresolver=cloudflare
+  #     - traefik.http.services.XXXXXXX.loadbalancer.server.port=80
+  #     #- traefik.http.routers.XXXXXXX.middlewares=authelia@docker
+  #   volumes:
+  #     - "{{ appdata_path }}/app:/config"
+  #   environment:
+  #     -
+  #   include_global_env_vars: #optional - defaults to false
+  #   restart: unless-stopped

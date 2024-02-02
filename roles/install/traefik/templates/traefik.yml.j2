@@ -1,0 +1,68 @@
+entryPoints:
+  web:
+    address: ":80"
+    http:
+      redirections:
+        entryPoint:
+          to: websecure
+          scheme: https
+    forwardedHeaders:
+      insecure: false
+      trustedIPs: ["172.18.0.0/16", "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13", "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22"]
+    proxyProtocol:
+      insecure: false
+      trustedIPs: ["172.18.0.0/16", "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13", "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22"]
+  websecure:
+    address: ":443"
+    http:
+      tls:
+        certresolver: cloudflare
+        domains:
+          - main: {{ main_domain }}
+            sans: "*.{{ main_domain }}"
+    forwardedHeaders:
+      insecure: false
+      trustedIPs: ["172.18.0.0/16", "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13", "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22"]
+    proxyProtocol:
+      insecure: false
+      trustedIPs: ["172.18.0.0/16", "173.245.48.0/20", "103.21.244.0/22", "103.22.200.0/22", "103.31.4.0/22", "141.101.64.0/18", "108.162.192.0/18", "190.93.240.0/20", "188.114.96.0/20", "197.234.240.0/22", "198.41.128.0/17", "162.158.0.0/15", "104.16.0.0/13", "104.24.0.0/14", "172.64.0.0/13", "131.0.72.0/22"]
+    
+ping: {}
+
+providers:
+  docker:
+    endpoint: unix:///var/run/docker.sock
+    watch: true
+    exposedByDefault: {{ traefik_exposed_by_default }}
+    network: public_access
+{% if traefik_file_provider %}
+  file:
+    directory: /etc/traefik/dynamic
+    watch: true
+{% endif %}
+
+{% if traefik_enable_dashboard %}
+api:
+  dashboard: true
+  insecure: true
+{% endif %}
+
+log:
+  level: {{ traefik_log_level }}
+
+certificatesResolvers:
+  cloudflare:
+    acme:
+      email: {{ email_address }}
+      storage: /etc/traefik/acme.json
+      dnsChallenge:
+        provider: cloudflare
+        delayBeforeCheck: 0
+        resolvers:
+          - 1.1.1.1:53
+          - 1.0.0.1:53
+
+{% if traefik_insecure_transport %}
+serversTransport:
+  insecureSkipVerify: true
+{% endif %}

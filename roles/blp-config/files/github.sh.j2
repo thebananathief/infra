@@ -1,0 +1,8 @@
+#! bin/sh
+
+eval `ssh-agent -s`
+ssh-add /home/{{ main_username }}/.ssh/github_ed25519
+
+git config --global user.name "thebananathief"
+git config --global user.email "cameron.salomone@gmail.com"
+git config --global init.defaultBranch main

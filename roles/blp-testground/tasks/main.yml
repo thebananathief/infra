@@ -1,0 +1,52 @@
+---
+# - name: run test task
+#   debug:
+#     msg: "The ansible user is {{ ansible_user }}"
+
+# - set_fact:
+#     cont_list: "{{ cont_list + [item.service_name] }}"
+#   loop: "{{ containers }}"
+
+# - name: print conts
+#   debug:
+#     var: item
+#   loop: "{{ cont_list }}"
+
+# - name: grafana in list
+#   debug:
+#     msg: Grafana is in the list!
+#   when: grafana in cont_list
+
+# - name: item is grafana
+#   debug:
+#     var: item
+#   when: item == "grafana"
+#   loop: "{{cont_list}}"
+
+# - debug:
+#     var: ansible_hostname
+# msg: "The ansible user is {{ ansible_user }}, running as {{ become }}"
+
+# - debug:
+#     var: telegraf_plugins_default
+
+# - name: check if nala is installed already
+#   stat:
+#     path: "{{ nala_binary_path }}"
+#   register: binary_exists
+
+# - debug:
+#     var: binary_exists.stat.exists
+
+# - name: Start the Telegraf service
+#   service:
+#     name: telegraf
+#     state: started
+#     enabled: true
+
+- ansible.builtin.debug:
+    msg: Hey there!
+
+- name: Test play
+  community.docker.docker_compose:
+    remove_orphans: true

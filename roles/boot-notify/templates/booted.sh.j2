@@ -1,0 +1,7 @@
+#!/bin/bash
+{# https://github.com/caronc/apprise #}
+{# "pover://{{ pushover_user_key }}@{{ pushover_api_bootlace }}" #}
+
+sleep 10
+/usr/local/bin/apprise -b "{{ ansible_hostname }} finished booting!" \
+"discord://{{ discord_webhook_id }}/{{ discord_webhook_token }}?avatar=no"

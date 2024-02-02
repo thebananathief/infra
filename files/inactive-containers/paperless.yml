@@ -1,0 +1,13 @@
+---
+### https://github.com/paperless-ngx/paperless-ngx
+- service_name: paperless
+  active: false
+  image: ghcr.io/paperless-ngx/paperless-ngx:latest
+  volumes:
+    - "{{ appdata_path }}/paperless/config:/config"
+    - "{{ appdata_path }}/paperless/data:/data"
+  environment:
+    - PAPERLESS_CONSUMER_RECURSIVE=true
+    - PAPERLESS_CONSUMER_SUBDIRS_AS_TAGS=true
+  include_global_env_vars: true
+  restart: unless-stopped
